@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Weather Dashboard</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 480px;
+    margin: 2rem auto;
+    background: #f0f4f8;
+    color: #333;
+    padding: 1rem;
+  }
+  h1 {
+    text-align: center;
+    color: #2563eb;
+  }
+  #weather-form {
+    display: flex;
+    margin-bottom: 1rem;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px;
+    font-size: 1rem;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    border: none;
+    background-color: #2563eb;
+    color: white;
+    font-weight: bold;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #1e40af;
+  }
+  #result {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  #result h2 {
+    margin-top: 0;
+  }
+</style>
+</head>
+<body>
+  <h1>Weather Dashboard</h1>
+  <form id="weather-form">
+    <input type="text" id="city" placeholder="Enter city name" required />
+    <button type="submit">Get Weather</button>
+  </form>
+  <div id="result"></div>
+
+  <script>
+    const apiKey = '8008af37500c9b3d7a0a07a6c31eb0ce'; // Replace this with your OpenWeatherMap API key
+
+    const form = document.getElementById('weather-form');
+    const resultDiv = document.getElementById('result');
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const city = document.getElementById('city').value.trim();
+      if (!city) return;
+
+      resultDiv.innerHTML = 'Loading...';
+
+      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=imperial`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('City not found');
+          }
+          return response.json();
+        })
+        .then(data => {
+          const { name, main, weather } = data;
+          resultDiv.innerHTML = `
+            <h2>Weather in ${name}</h2>
+            <p><strong>Temperature:</strong> ${main.temp}°F</p>
+            <p><strong>Condition:</strong> ${weather[0].description}</p>
+            <p><strong>Humidity:</strong> ${main.humidity}%</p>
+          `;
+        })
+        .catch(err => {
+          resultDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
+        });
+    });
+  </script>
+</body>
+</html>
