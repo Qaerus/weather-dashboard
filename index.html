@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Weather Dashboard with Autocomplete</title>
+<title>Advanced Weather Dashboard</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -86,76 +86,109 @@
   <div id="result"></div>
 
   <script>
-    const apiKey = '8008af37500c9b3d7a0a07a6c31eb0ce'; // Replace with your OpenWeatherMap API key
-
-    // Sample city list for autocomplete (add more as needed)
-    const cities = [
-      "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
-      "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose",
-      "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte",
-      "San Francisco", "Indianapolis", "Seattle", "Denver", "Washington"
-    ];
-
+    const openWeatherApiKey = '8008af37500c9b3d7a0a07a6c31eb0ce'; // Replace this with your OpenWeatherMap API key
     const cityInput = document.getElementById('city');
     const suggestions = document.getElementById('suggestions');
     const resultDiv = document.getElementById('result');
     const form = document.getElementById('weather-form');
 
-    // Show matching city suggestions based on input
-    cityInput.addEventListener('input', () => {
-      const inputVal = cityInput.value.trim().toLowerCase();
-      if (!inputVal) {
+    let selectedCity = null;
+
+    // Fetch city suggestions from OpenWeatherMap Geo API
+    async function fetchCitySuggestions(query) {
+      if (!query) return [];
+      const limit = 5;
+      const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=${limit}&appid=${openWeatherApiKey}`;
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch city data');
+        const data = await response.json();
+        return data; // Array of city objects with name, state, country, lat, lon
+      } catch (err) {
+        console.error(err);
+        return [];
+      }
+    }
+
+    cityInput.addEventListener('input', async () => {
+      const query = cityInput.value.trim();
+      if (query.length < 2) {
         suggestions.hidden = true;
         return;
       }
-      const matched = cities.filter(city => city.toLowerCase().startsWith(inputVal));
-      if (matched.length === 0) {
+      const cities = await fetchCitySuggestions(query);
+      if (cities.length === 0) {
         suggestions.hidden = true;
         return;
       }
-      suggestions.innerHTML = matched.map(city => `<li>${city}</li>`).join('');
+      suggestions.innerHTML = cities.map(city => {
+        const state = city.state ? `, ${city.state}` : '';
+        return `<li data-lat="${city.lat}" data-lon="${city.lon}">${city.name}${state}, ${city.country}</li>`;
+      }).join('');
       suggestions.hidden = false;
     });
 
-    // Clicking a suggestion sets the input value
+    // When user clicks a suggestion, fill input and store coords
     suggestions.addEventListener('click', e => {
       if (e.target.tagName.toLowerCase() === 'li') {
         cityInput.value = e.target.textContent;
+        selectedCity = {
+          lat: e.target.getAttribute('data-lat'),
+          lon: e.target.getAttribute('data-lon')
+        };
         suggestions.hidden = true;
       }
     });
 
-    // Hide suggestions if clicking outside
+    // Hide suggestions when clicking outside
     document.addEventListener('click', e => {
       if (!form.contains(e.target)) {
         suggestions.hidden = true;
       }
     });
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
-      const city = cityInput.value.trim();
-      if (!city) return;
+      let lat, lon, cityName;
+
+      if (selectedCity) {
+        lat = selectedCity.lat;
+        lon = selectedCity.lon;
+        cityName = cityInput.value;
+      } else {
+        // If no suggestion selected, try to geocode city manually
+        const query = cityInput.value.trim();
+        if (!query) return;
+
+        // Fetch city data
+        const cities = await fetchCitySuggestions(query);
+        if (cities.length === 0) {
+          resultDiv.innerHTML = `<p style="color:red;">City not found</p>`;
+          return;
+        }
+        lat = cities[0].lat;
+        lon = cities[0].lon;
+        cityName = `${cities[0].name}${cities[0].state ? ', ' + cities[0].state : ''}, ${cities[0].country}`;
+      }
 
       resultDiv.innerHTML = 'Loading...';
 
-      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=imperial`)
-        .then(response => {
-          if (!response.ok) throw new Error('City not found');
-          return response.json();
-        })
-        .then(data => {
-          const { name, main, weather } = data;
-          resultDiv.innerHTML = `
-            <h2>Weather in ${name}</h2>
-            <p><strong>Temperature:</strong> ${main.temp}°F</p>
-            <p><strong>Condition:</strong> ${weather[0].description}</p>
-            <p><strong>Humidity:</strong> ${main.humidity}%</p>
-          `;
-        })
-        .catch(err => {
-          resultDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
-        });
+      // Fetch weather by lat/lon (more accurate)
+      try {
+        const weatherResp = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${openWeatherApiKey}&units=imperial`);
+        if (!weatherResp.ok) throw new Error('Weather data not found');
+        const weatherData = await weatherResp.json();
+
+        const { main, weather } = weatherData;
+        resultDiv.innerHTML = `
+          <h2>Weather in ${cityName}</h2>
+          <p><strong>Temperature:</strong> ${main.temp}°F</p>
+          <p><strong>Condition:</strong> ${weather[0].description}</p>
+          <p><strong>Humidity:</strong> ${main.humidity}%</p>
+        `;
+      } catch (err) {
+        resultDiv.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
     });
   </script>
 </body>
