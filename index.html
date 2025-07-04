@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Weather Dashboard</title>
+<title>Weather Dashboard with Autocomplete</title>
 <style>
   body {
     font-family: Arial, sans-serif;
@@ -18,23 +18,46 @@
     color: #2563eb;
   }
   #weather-form {
-    display: flex;
+    position: relative;
     margin-bottom: 1rem;
   }
   input[type="text"] {
-    flex: 1;
+    width: 100%;
     padding: 0.5rem;
     border: 1px solid #ccc;
-    border-radius: 4px 0 0 4px;
+    border-radius: 4px;
     font-size: 1rem;
   }
+  ul.suggestions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 150px;
+    overflow-y: auto;
+    position: absolute;
+    width: 100%;
+    background: white;
+    z-index: 10;
+  }
+  ul.suggestions li {
+    padding: 0.5rem;
+    cursor: pointer;
+  }
+  ul.suggestions li:hover {
+    background-color: #2563eb;
+    color: white;
+  }
   button {
-    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+    width: 100%;
+    padding: 0.5rem;
     border: none;
     background-color: #2563eb;
     color: white;
     font-weight: bold;
-    border-radius: 0 4px 4px 0;
+    border-radius: 4px;
     cursor: pointer;
   }
   button:hover {
@@ -53,30 +76,72 @@
 </head>
 <body>
   <h1>Weather Dashboard</h1>
-  <form id="weather-form">
-    <input type="text" id="city" placeholder="Enter city name" required />
+  <form id="weather-form" autocomplete="off">
+    <div style="position: relative;">
+      <input type="text" id="city" placeholder="Enter city name" required />
+      <ul class="suggestions" id="suggestions" hidden></ul>
+    </div>
     <button type="submit">Get Weather</button>
   </form>
   <div id="result"></div>
 
   <script>
-    const apiKey = '8008af37500c9b3d7a0a07a6c31eb0ce'; // Replace this with your OpenWeatherMap API key
+    const apiKey = '8008af37500c9b3d7a0a07a6c31eb0ce'; // Replace with your OpenWeatherMap API key
 
-    const form = document.getElementById('weather-form');
+    // Sample city list for autocomplete (add more as needed)
+    const cities = [
+      "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
+      "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose",
+      "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte",
+      "San Francisco", "Indianapolis", "Seattle", "Denver", "Washington"
+    ];
+
+    const cityInput = document.getElementById('city');
+    const suggestions = document.getElementById('suggestions');
     const resultDiv = document.getElementById('result');
+    const form = document.getElementById('weather-form');
+
+    // Show matching city suggestions based on input
+    cityInput.addEventListener('input', () => {
+      const inputVal = cityInput.value.trim().toLowerCase();
+      if (!inputVal) {
+        suggestions.hidden = true;
+        return;
+      }
+      const matched = cities.filter(city => city.toLowerCase().startsWith(inputVal));
+      if (matched.length === 0) {
+        suggestions.hidden = true;
+        return;
+      }
+      suggestions.innerHTML = matched.map(city => `<li>${city}</li>`).join('');
+      suggestions.hidden = false;
+    });
+
+    // Clicking a suggestion sets the input value
+    suggestions.addEventListener('click', e => {
+      if (e.target.tagName.toLowerCase() === 'li') {
+        cityInput.value = e.target.textContent;
+        suggestions.hidden = true;
+      }
+    });
+
+    // Hide suggestions if clicking outside
+    document.addEventListener('click', e => {
+      if (!form.contains(e.target)) {
+        suggestions.hidden = true;
+      }
+    });
 
     form.addEventListener('submit', e => {
       e.preventDefault();
-      const city = document.getElementById('city').value.trim();
+      const city = cityInput.value.trim();
       if (!city) return;
 
       resultDiv.innerHTML = 'Loading...';
 
       fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=imperial`)
         .then(response => {
-          if (!response.ok) {
-            throw new Error('City not found');
-          }
+          if (!response.ok) throw new Error('City not found');
           return response.json();
         })
         .then(data => {
